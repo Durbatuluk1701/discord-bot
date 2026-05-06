@@ -3,6 +3,11 @@ import { container } from 'tsyringe';
 
 const config = container.resolve(Config);
 
+function getPrivateApiToken(): string {
+  if (!config.privateApiToken) throw new Error('Private API token is not configured');
+  return config.privateApiToken;
+}
+
 function buildUrl(path: string, query?: Record<string, string | number | boolean>): string {
   const base = `${config.statsfm.http.apiUrl}/v${config.statsfm.http.version}${path}`;
   if (!query) return base;
@@ -19,11 +24,12 @@ export async function privateApiGet<T>(
   const url = buildUrl(path, query);
   const res = await fetch(url, {
     headers: {
-      Authorization: config.privateApiToken!
+      Authorization: getPrivateApiToken()
     }
   });
   if (!res.ok) {
-    throw new Error(`Private API error: ${res.status} ${res.statusText}`);
+    const body = await res.text();
+    throw new Error(`Private API error: ${res.status} ${res.statusText} - ${body}`);
   }
   return res.json() as Promise<T>;
 }
@@ -37,13 +43,14 @@ export async function privateApiPost<T>(
   const res = await fetch(url, {
     method: 'POST',
     headers: {
-      Authorization: config.privateApiToken!,
+      Authorization: getPrivateApiToken(),
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(body)
   });
   if (!res.ok) {
-    throw new Error(`Private API error: ${res.status} ${res.statusText}`);
+    const responseBody = await res.text();
+    throw new Error(`Private API error: ${res.status} ${res.statusText} - ${responseBody}`);
   }
   return res.json() as Promise<T>;
 }
