@@ -1,14 +1,18 @@
 import { Config } from './Config';
 import { container } from 'tsyringe';
 
-const config = container.resolve(Config);
+function getConfig(): Config {
+  return container.resolve(Config);
+}
 
 function getPrivateApiToken(): string {
+  const config = getConfig();
   if (!config.privateApiToken) throw new Error('Private API token is not configured');
   return config.privateApiToken;
 }
 
 function buildUrl(path: string, query?: Record<string, string | number | boolean>): string {
+  const config = getConfig();
   const base = `${config.statsfm.http.apiUrl}/v${config.statsfm.http.version}${path}`;
   if (!query) return base;
   const params = new URLSearchParams(
