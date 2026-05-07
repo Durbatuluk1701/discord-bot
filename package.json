@@ -9,6 +9,7 @@
     "lint": "eslint . --ext .ts",
     "lint:tsc": "tsc --noEmit -p .",
     "lint:fix": "eslint . --ext .ts --fix",
+    "test": "tsc -p tsconfig.test.json && node --test 'dist-test/__tests__/privateApi.test.js'",
     "start": "node dist/index.js"
   },
   "dependencies": {
@@ -20,10 +21,6 @@
     "dayjs": "^1.11.11",
     "discord.js": "^14.15.3",
     "dotenv": "^16.4.5",
-    "fs-nextra": "^0.5.1",
-    "murmurhash-js": "^1.0.0",
-    "node-fetch": "^2.7.0",
-    "node-machine-id": "^1.1.12",
     "ow": "^0.28.2",
     "readdirp": "^3.6.0",
     "reflect-metadata": "^0.2.2",
@@ -31,9 +28,7 @@
     "tsyringe": "^4.8.0"
   },
   "devDependencies": {
-    "@types/murmurhash-js": "^1.0.6",
     "@types/node": "^20.14.10",
-    "@types/node-fetch": "^2.6.11",
     "@types/ws": "^8.5.10",
     "@typescript-eslint/eslint-plugin": "^7.16.0",
     "@typescript-eslint/parser": "^7.16.0",

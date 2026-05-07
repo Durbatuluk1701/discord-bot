@@ -12,7 +12,6 @@ import {
 } from '../../../util/embed';
 import { getCurrentlyPlaying } from '../../nowPlaying';
 import { PrivacyManager } from '../../../util/PrivacyManager';
-import { Config } from '../../../util/Config';
 import {
   createPaginationComponentTypes,
   createPaginationManager
@@ -20,9 +19,9 @@ import {
 import { getDuration } from '../../../util/getDuration';
 import { setTimeout } from 'timers/promises';
 import { WhoKnowsConsts } from '../whoknows';
+import { privateApiGet, privateApiPost } from '../../../util/privateApi';
 
 const api = container.resolve(Api);
-const config = container.resolve(Config);
 const analytics = container.resolve(Analytics);
 const privacyManager = container.resolve(PrivacyManager);
 
@@ -91,13 +90,8 @@ export const whoKnowsArtistSubCommand: SubcommandFunction<
 
   const artist = await api.artists.get(artistId);
 
-  const hasMembersCached = await api.http.get<{ success: boolean }>(
-    `/private/discord/bot/servers/${interaction.guildId}/member-cache`,
-    {
-      headers: {
-        Authorization: config.privateApiToken!
-      }
-    }
+  const hasMembersCached = await privateApiGet<{ success: boolean }>(
+    `/private/discord/bot/servers/${interaction.guildId}/member-cache`
   );
 
   if (hasMembersCached.success === false) {
@@ -107,19 +101,13 @@ export const whoKnowsArtistSubCommand: SubcommandFunction<
     const guildMembers = await interaction.guild.members.fetch();
     const amountOfRequests = Math.ceil(guildMembers.size / WhoKnowsConsts.guildMemberBatchSize);
     for (let i = 0; i < guildMembers.size; i += WhoKnowsConsts.guildMemberBatchSize) {
-      await api.http.post(`/private/discord/bot/servers/${interaction.guildId}/member-cache`, {
-        body: JSON.stringify(
-          Array.from(guildMembers)
-            .slice(i, i + WhoKnowsConsts.guildMemberBatchSize)
-            .map(([, member]) => member.user.id)
-        ),
-        query: {
-          batch: amountOfRequests > 1 ? true : false
-        },
-        headers: {
-          Authorization: config.privateApiToken!
-        }
-      });
+      await privateApiPost(
+        `/private/discord/bot/servers/${interaction.guildId}/member-cache`,
+        Array.from(guildMembers)
+          .slice(i, i + WhoKnowsConsts.guildMemberBatchSize)
+          .map(([, member]) => member.user.id),
+        { batch: amountOfRequests > 1 ? true : false }
+      );
       await setTimeout(1000);
       await respond(interaction, {
         content: WhoKnowsConsts.statusMessages.fetchingServerMembersCount(i, guildMembers.size)
@@ -143,7 +131,7 @@ export const whoKnowsArtistSubCommand: SubcommandFunction<
     rangeDisplay = 'past 6 months';
   }
 
-  const data = await api.http.get<
+  const data = await privateApiGet<
     {
       position: number;
       streams: number;
@@ -155,12 +143,7 @@ export const whoKnowsArtistSubCommand: SubcommandFunction<
       };
     }[]
   >(`/private/discord/bot/servers/${interaction.guildId}/top-listeners/artists/${artistId}`, {
-    query: {
-      range
-    },
-    headers: {
-      Authorization: config.privateApiToken!
-    }
+    range
   });
 
   if (data.length === 0) {

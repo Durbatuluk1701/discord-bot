@@ -1,4 +1,3 @@
-import fetch from 'node-fetch';
 import { singleton } from 'tsyringe';
 import { Config } from './Config';
 

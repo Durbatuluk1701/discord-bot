@@ -205,7 +205,16 @@ export default createEvent('interactionCreate')
             Date.now() - timeStart
           }ms (${Date.now() - timeExecute}ms to execute)`
         );
-        reportError(e, interaction);
+        const errorId = reportError(e, interaction);
+        if (!interaction.isAutocomplete()) {
+          try {
+            await respond(interaction, {
+              content: `An unexpected error occurred while executing this command. Reference ID: \`${errorId}\``
+            });
+          } catch (_replyError) {
+            // Ignore errors when trying to send the error reply
+          }
+        }
       }
     } else {
       if (!interaction.isAutocomplete())
