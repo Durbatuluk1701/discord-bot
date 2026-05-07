@@ -44,11 +44,10 @@ function makeConfig(privateApiToken?: string) {
 // ---------------------------------------------------------------------------
 type CapturedRequest = { url: string; init: RequestInit };
 
-let originalFetch: typeof globalThis.fetch;
+const originalFetch: typeof globalThis.fetch = globalThis.fetch;
 
 function mockFetch(response: unknown, status = 200): CapturedRequest[] {
   const captured: CapturedRequest[] = [];
-  originalFetch = globalThis.fetch;
   (globalThis as Record<string, unknown>).fetch = async (
     url: string,
     init?: RequestInit
