@@ -44,8 +44,11 @@ function makeConfig(privateApiToken?: string) {
 // ---------------------------------------------------------------------------
 type CapturedRequest = { url: string; init: RequestInit };
 
+let originalFetch: typeof globalThis.fetch;
+
 function mockFetch(response: unknown, status = 200): CapturedRequest[] {
   const captured: CapturedRequest[] = [];
+  originalFetch = globalThis.fetch;
   (globalThis as Record<string, unknown>).fetch = async (
     url: string,
     init?: RequestInit
@@ -62,6 +65,10 @@ function mockFetch(response: unknown, status = 200): CapturedRequest[] {
   return captured;
 }
 
+function restoreFetch(): void {
+  globalThis.fetch = originalFetch;
+}
+
 // ---------------------------------------------------------------------------
 // Test suite
 // ---------------------------------------------------------------------------
@@ -73,6 +80,7 @@ describe('privateApiGet', () => {
 
   afterEach(() => {
     container.clearInstances();
+    restoreFetch();
   });
 
   test('builds the correct versioned URL', async () => {
@@ -143,6 +151,7 @@ describe('privateApiPost', () => {
 
   afterEach(() => {
     container.clearInstances();
+    restoreFetch();
   });
 
   test('sends POST method with correct URL', async () => {
@@ -208,7 +217,11 @@ describe('privateApiPost', () => {
 
 describe('HttpManager header overwrite (demonstrates root cause)', () => {
   test('HttpManager.resolveRequest puts library Authorization after caller headers', async () => {
-    // Load the actual HttpManager from the installed statsfm.js library
+    // The public @statsfm/statsfm.js API does not export HttpManager directly.
+    // We access the internal dist path here solely to inspect the header-merging
+    // behaviour of resolveRequest in a white-box test — this is intentional and
+    // acceptable in a test-only context. If the library restructures its internals
+    // this test will fail loudly, which is the desired signal.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { HttpManager } = require('@statsfm/statsfm.js/dist/lib/http/HttpManager');
 
