@@ -20,6 +20,7 @@ import {
 import { getDuration } from '../../../util/getDuration';
 import { setTimeout } from 'timers/promises';
 import { WhoKnowsConsts } from '../whoknows';
+import { reportError } from '../../../util/Sentry';
 
 const api = container.resolve(Api);
 const config = container.resolve(Config);
@@ -89,47 +90,6 @@ export const whoKnowsTrackSubCommand: SubcommandFunction<
     });
   }
 
-  const track = await api.tracks.get(trackId);
-
-  const hasMembersCached = await api.http.get<{ success: boolean }>(
-    `/private/discord/bot/servers/${interaction.guildId}/member-cache`,
-    {
-      headers: {
-        Authorization: config.privateApiToken!
-      }
-    }
-  );
-
-  if (hasMembersCached.success === false) {
-    await respond(interaction, {
-      content: WhoKnowsConsts.statusMessages.fetchingServerMembers
-    });
-    const guildMembers = await interaction.guild.members.fetch();
-    const amountOfRequests = Math.ceil(guildMembers.size / WhoKnowsConsts.guildMemberBatchSize);
-    for (let i = 0; i < guildMembers.size; i += WhoKnowsConsts.guildMemberBatchSize) {
-      await api.http.post(`/private/discord/bot/servers/${interaction.guildId}/member-cache`, {
-        body: JSON.stringify(
-          Array.from(guildMembers)
-            .slice(i, i + WhoKnowsConsts.guildMemberBatchSize)
-            .map(([, member]) => member.user.id)
-        ),
-        query: {
-          batch: amountOfRequests > 1 ? true : false
-        },
-        headers: {
-          Authorization: config.privateApiToken!
-        }
-      });
-      await setTimeout(1000);
-      await respond(interaction, {
-        content: WhoKnowsConsts.statusMessages.fetchingServerMembersCount(i, guildMembers.size)
-      });
-    }
-  }
-  await respond(interaction, {
-    content: WhoKnowsConsts.statusMessages.fetchingTopListeners
-  });
-
   let range = Range.LIFETIME;
   let rangeDisplay = 'lifetime';
 
@@ -143,25 +103,85 @@ export const whoKnowsTrackSubCommand: SubcommandFunction<
     rangeDisplay = 'past 6 months';
   }
 
-  const data = await api.http.get<
-    {
-      position: number;
-      streams: number;
-      playedMs: number;
-      user: {
-        id: string;
-        displayName: string;
-        discordUserId: string | '';
-      };
-    }[]
-  >(`/private/discord/bot/servers/${interaction.guildId}/top-listeners/tracks/${trackId}`, {
-    query: {
-      range
-    },
-    headers: {
-      Authorization: config.privateApiToken!
+  let track: Awaited<ReturnType<typeof api.tracks.get>>;
+  let data: {
+    position: number;
+    streams: number;
+    playedMs: number;
+    user: {
+      id: string;
+      displayName: string;
+      discordUserId: string | '';
+    };
+  }[];
+
+  try {
+    track = await api.tracks.get(trackId);
+
+    const hasMembersCached = await api.http.get<{ success: boolean }>(
+      `/private/discord/bot/servers/${interaction.guildId}/member-cache`,
+      {
+        headers: {
+          Authorization: config.privateApiToken!
+        }
+      }
+    );
+
+    if (hasMembersCached.success === false) {
+      await respond(interaction, {
+        content: WhoKnowsConsts.statusMessages.fetchingServerMembers
+      });
+      const guildMembers = await interaction.guild.members.fetch();
+      const amountOfRequests = Math.ceil(guildMembers.size / WhoKnowsConsts.guildMemberBatchSize);
+      for (let i = 0; i < guildMembers.size; i += WhoKnowsConsts.guildMemberBatchSize) {
+        await api.http.post(`/private/discord/bot/servers/${interaction.guildId}/member-cache`, {
+          body: JSON.stringify(
+            Array.from(guildMembers)
+              .slice(i, i + WhoKnowsConsts.guildMemberBatchSize)
+              .map(([, member]) => member.user.id)
+          ),
+          query: {
+            batch: amountOfRequests > 1 ? true : false
+          },
+          headers: {
+            Authorization: config.privateApiToken!
+          }
+        });
+        await setTimeout(1000);
+        await respond(interaction, {
+          content: WhoKnowsConsts.statusMessages.fetchingServerMembersCount(i, guildMembers.size)
+        });
+      }
     }
-  });
+    await respond(interaction, {
+      content: WhoKnowsConsts.statusMessages.fetchingTopListeners
+    });
+
+    data = await api.http.get<
+      {
+        position: number;
+        streams: number;
+        playedMs: number;
+        user: {
+          id: string;
+          displayName: string;
+          discordUserId: string | '';
+        };
+      }[]
+    >(`/private/discord/bot/servers/${interaction.guildId}/top-listeners/tracks/${trackId}`, {
+      query: {
+        range
+      },
+      headers: {
+        Authorization: config.privateApiToken!
+      }
+    });
+  } catch (err) {
+    const errorId = reportError(err, interaction);
+    return respond(interaction, {
+      embeds: [unexpectedErrorEmbed(errorId)]
+    });
+  }
 
   if (data.length === 0) {
     await analytics.track(`WHO_KNOWS_TRACK_${range}_no_data`);
